@@ -1,0 +1,28 @@
+# Project FRIDAY - Python Dependencies
+# Windows 10/11 64-bit Python 3.11 - 3.13 compatible
+
+# GUI
+PySide6>=6.7.0
+
+# System Monitoring & Hardware
+psutil>=5.9.8
+pywin32>=306
+
+# Secure Secrets & Configuration
+keyring>=24.3.0
+
+# Networking & Async
+requests>=2.31.0
+aiohttp>=3.9.5
+
+# Audio & Speech
+sounddevice>=0.4.6
+numpy>=1.26.0
+pyttsx3>=2.90
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# Optional Browser Automation
+playwright>=1.43.0

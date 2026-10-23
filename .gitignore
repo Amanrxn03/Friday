@@ -1,0 +1,54 @@
+# Project FRIDAY - .gitignore
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+
+# Secrets & Environment Local Config
+.env
+*.pem
+*.key
+*.pfx
+
+# Local Database & User State
+data/
+*.db
+*.sqlite3
+logs/
+*.log
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+
