@@ -293,6 +293,43 @@ def register_default_tools(registry: ToolRegistry) -> None:
         is_high_impact=False,
     )
 
+    # 16. Set Voice Profile
+    from app.voice.text_to_speech import tts_manager
+    registry.register(
+        name="set_voice_profile",
+        description="Switch FRIDAY's speaking voice persona (e.g. 'kriti' for custom cloned voice, 'heera' for Indian English, 'zira' for US English).",
+        parameters={
+            "type": "object",
+            "properties": {
+                "profile_id": {
+                    "type": "string",
+                    "description": "Voice profile identifier ('kriti', 'heera', 'zira', 'david')",
+                }
+            },
+            "required": ["profile_id"],
+        },
+        handler=lambda profile_id="kriti": (tts_manager.set_voice_profile(profile_id), {"status": "success", "voice_profile": profile_id})[1],
+        is_high_impact=False,
+    )
+
+    # 17. Play Voice Sample
+    registry.register(
+        name="play_voice_sample",
+        description="Play Kriti's original audio sample or any voice reference file.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "sample_path": {
+                    "type": "string",
+                    "description": "Optional path to the voice sample file",
+                }
+            },
+        },
+        handler=lambda sample_path=None: (tts_manager.play_custom_sample(sample_path), {"status": "success", "playing": True})[1],
+        is_high_impact=False,
+    )
+
+
 
 # Global tool registry singleton
 tool_registry = ToolRegistry()

@@ -6,7 +6,7 @@ Windows startup integration, voice parameters, and autonomy permission modes.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox,
-    QSlider, QCheckBox, QFrame, QScrollArea, QMessageBox
+    QSlider, QCheckBox, QFrame, QScrollArea, QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt
 
@@ -161,7 +161,71 @@ class SettingsView(QWidget):
         voice_card = QFrame()
         voice_card.setProperty("class", "glass-card")
         v_layout = QVBoxLayout(voice_card)
-        v_layout.addWidget(QLabel("<b>MULTILINGUAL VOICE & SPEECH CONFIGURATION</b>"))
+        v_layout.addWidget(QLabel("<b>VOICE PERSONA & CUSTOM VOICE CLONING (KRITI'S VOICE)</b>"))
+
+        # Voice Profile Selector
+        row_voice = QHBoxLayout()
+        row_voice.addWidget(QLabel("Active Voice Persona:"))
+        self.combo_voice = QComboBox()
+        self._voice_items = [
+            ("kriti", "🌟 Kriti's Voice (Custom Clone - WhatsApp Sample)"),
+            ("heera", "Microsoft Heera (Indian English - Natural Female)"),
+            ("zira", "Microsoft Zira (US English Female)"),
+            ("david", "Microsoft David (US English Male)"),
+        ]
+        for vid, vlabel in self._voice_items:
+            self.combo_voice.addItem(vlabel, vid)
+
+        # Select current profile
+        cur_prof = tts_manager.voice_profile
+        for i, (vid, _) in enumerate(self._voice_items):
+            if vid == cur_prof:
+                self.combo_voice.setCurrentIndex(i)
+                break
+        self.combo_voice.currentIndexChanged.connect(self._on_voice_profile_changed)
+        row_voice.addWidget(self.combo_voice)
+
+        # Sample & Test buttons
+        self.btn_listen_sample = QPushButton("▶ Listen to Sample")
+        self.btn_listen_sample.setProperty("class", "secondary-btn")
+        self.btn_listen_sample.clicked.connect(lambda: tts_manager.play_custom_sample())
+        row_voice.addWidget(self.btn_listen_sample)
+
+        self.btn_test_voice = QPushButton("🔊 Test Voice")
+        self.btn_test_voice.setProperty("class", "primary-btn")
+        self.btn_test_voice.clicked.connect(self._test_voice_speech)
+        row_voice.addWidget(self.btn_test_voice)
+        row_voice.addStretch()
+        v_layout.addLayout(row_voice)
+
+        # Custom Sample Reference Path
+        row_sample_file = QHBoxLayout()
+        row_sample_file.addWidget(QLabel("Voice Sample Source:"))
+        self.txt_voice_path = QLineEdit(tts_manager.custom_voice_path)
+        self.txt_voice_path.setReadOnly(True)
+        row_sample_file.addWidget(self.txt_voice_path)
+
+        btn_browse_voice = QPushButton("Browse...")
+        btn_browse_voice.setProperty("class", "secondary-btn")
+        btn_browse_voice.clicked.connect(self._browse_voice_sample)
+        row_sample_file.addWidget(btn_browse_voice)
+        v_layout.addLayout(row_sample_file)
+
+        # ElevenLabs Instant Voice Cloning API Key (Optional)
+        row_el = QHBoxLayout()
+        row_el.addWidget(QLabel("ElevenLabs Key (For Neural Cloning):"))
+        self.txt_elevenlabs_key = QLineEdit()
+        self.txt_elevenlabs_key.setEchoMode(QLineEdit.Password)
+        self.txt_elevenlabs_key.setPlaceholderText("xi-api-key (Enables zero-shot dynamic speech in Kriti's voice)")
+        if secret_store.has_credential("elevenlabs"):
+            self.txt_elevenlabs_key.setText("••••••••••••••••••••••••")
+        row_el.addWidget(self.txt_elevenlabs_key)
+
+        btn_save_el = QPushButton("Save & Clone")
+        btn_save_el.setProperty("class", "secondary-btn")
+        btn_save_el.clicked.connect(self._save_and_clone_elevenlabs)
+        row_el.addWidget(btn_save_el)
+        v_layout.addLayout(row_el)
 
         # Language Mode
         row_lang = QHBoxLayout()
@@ -234,6 +298,44 @@ class SettingsView(QWidget):
         if success:
             QMessageBox.information(self, "Saved", f"Securely stored {provider.title()} API key in Windows Credential Manager.")
 
+    def _on_voice_profile_changed(self, idx: int) -> None:
+        if idx >= 0 and idx < len(self._voice_items):
+            vid, label = self._voice_items[idx]
+            tts_manager.set_voice_profile(vid)
+
+    def _test_voice_speech(self) -> None:
+        tts_manager.speak("Hello! I am Friday, speaking with your chosen voice. What else can I do for you?")
+
+    def _browse_voice_sample(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Custom Voice Audio Sample",
+            tts_manager.custom_voice_path,
+            "Audio Files (*.wav *.ogg *.mp3 *.m4a);;All Files (*.*)",
+        )
+        if file_path:
+            tts_manager.custom_voice_path = file_path
+            config.voice.custom_voice_path = file_path
+            self.txt_voice_path.setText(file_path)
+            QMessageBox.information(self, "Voice Sample Updated", f"Loaded custom voice sample from:\n{file_path}")
+
+    def _save_and_clone_elevenlabs(self) -> None:
+        key_val = self.txt_elevenlabs_key.text().strip()
+        if key_val and "••••" not in key_val:
+            secret_store.set_credential("elevenlabs", key_val)
+
+        res = tts_manager.clone_voice_elevenlabs()
+        if res.get("success"):
+            QMessageBox.information(
+                self, "Voice Cloned Successfully",
+                f"Kriti's voice was successfully cloned in ElevenLabs!\nVoice ID: {res.get('voice_id')}\nFRIDAY will now speak in her cloned voice."
+            )
+        else:
+            QMessageBox.warning(
+                self, "Cloning Status",
+                f"Stored API key. Note: {res.get('error', 'Ready for synthesis.')}"
+            )
+
     def _test_connection(self) -> None:
         provider = self.combo_provider.currentText()
         res = provider_manager.test_connectivity(provider)
@@ -262,3 +364,4 @@ class SettingsView(QWidget):
             startup_service.enable_startup()
         else:
             startup_service.disable_startup()
+

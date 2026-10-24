@@ -198,3 +198,35 @@ def test_conversational_prefix_and_low_latency_matching():
         assert elapsed_ms < 5.0, f"Latency {elapsed_ms:.2f}ms exceeded 5.0ms target"
 
 
+def test_custom_voice_profile_and_kriti_selection():
+    """Verify custom voice profile management, Kriti voice asset existence, and intent routing."""
+    import os
+    from app.voice.text_to_speech import tts_manager
+    from app.nlp.intent_matcher import IntentMatcher
+    from app.config import config
+
+    # 1. Voice listing and profile switching
+    voices = tts_manager.list_available_voices()
+    voice_ids = [v["id"] for v in voices]
+    assert "kriti" in voice_ids
+    assert "heera" in voice_ids
+
+    tts_manager.set_voice_profile("kriti")
+    assert tts_manager.voice_profile == "kriti"
+    assert config.voice.voice_profile == "kriti"
+
+    # 2. Asset files check
+    wav_path = r"c:\Friday\app\assets\custom_voices\kriti.wav"
+    assert os.path.exists(wav_path)
+    assert os.path.getsize(wav_path) > 10000
+
+    # 3. Fast-path intent matching for voice selection
+    matcher = IntentMatcher()
+    for q in ["use kriti's voice", "I want to use her voice", "switch to kriti's voice"]:
+        intent = matcher.match_intent(q)
+        assert intent is not None, f"Failed matching query: {q}"
+        assert intent.tool_name == "set_voice_profile"
+        assert intent.tool_args.get("profile_id") == "kriti"
+
+
+

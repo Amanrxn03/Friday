@@ -52,7 +52,11 @@ class VoiceConfig:
     """Settings for speech-to-text, wake-word, and text-to-speech."""
     enabled: bool = os.getenv("FRIDAY_VOICE_ENABLED", "true").lower() == "true"
     wake_word: str = os.getenv("FRIDAY_WAKE_WORD", "Hey Friday")
-    provider: str = os.getenv("FRIDAY_VOICE_PROVIDER", "local_sapi")  # local_sapi or cloud_openai
+    provider: str = os.getenv("FRIDAY_VOICE_PROVIDER", "local_sapi")  # local_sapi, cloud_openai, elevenlabs_clone
+    voice_profile: str = os.getenv("FRIDAY_VOICE_PROFILE", "kriti")   # kriti, heera, zira, david
+    custom_voice_path: str = os.getenv("FRIDAY_CUSTOM_VOICE_PATH", r"c:\Friday\app\assets\custom_voices\kriti.wav")
+    custom_voice_name: str = os.getenv("FRIDAY_CUSTOM_VOICE_NAME", "Kriti's Voice")
+    elevenlabs_voice_id: Optional[str] = os.getenv("ELEVENLABS_VOICE_ID", None)
     speech_rate: int = int(os.getenv("FRIDAY_SPEECH_RATE", "185"))
     volume: float = float(os.getenv("FRIDAY_SPEECH_VOLUME", "0.9"))
     push_to_talk: bool = os.getenv("FRIDAY_PUSH_TO_TALK", "false").lower() == "true"

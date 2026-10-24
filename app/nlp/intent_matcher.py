@@ -88,6 +88,44 @@ class IntentMatcher:
                     },
                 )
 
+        # 2b. Voice Profile & Custom Voice Cloning (Kriti's Voice)
+        voice_select_patterns = [
+            r"\b(use|select|set|switch\s*to)?\s*(kriti'?s?\s*voice|her\s*voice|kriti\s*ki\s*awaaz)\b",
+            r"\b(i\s*want\s*to\s*use\s*(her|kriti'?s?)\s*voice)\b",
+            r"\b(kriti\s*ki\s*awaaz\s*(use|set|chahiye|lagao))\b",
+        ]
+        for pat in voice_select_patterns:
+            if re.search(pat, lower) or re.search(pat, norm_lower):
+                return ParsedIntent(
+                    tool_name="set_voice_profile",
+                    tool_args={"profile_id": "kriti"},
+                    confidence=0.99,
+                    detected_language=lang,
+                    conversational_replies={
+                        "en": "I have selected Kriti's voice for you. I will now speak with her voice profile.",
+                        "hi": "मैंने कृति की आवाज़ चुन ली है। अब मैं इसी आवाज़ में बात करूँगी।",
+                        "hinglish": "Kriti ki voice select kar li hai. Ab main unki voice profile use karungi.",
+                    },
+                )
+
+        voice_play_patterns = [
+            r"\b(play|listen\s*to|sunao)\s*(kriti'?s?\s*voice|sample|her\s*voice|recording)\b",
+            r"\b(kriti\s*ki\s*awaaz\s*(sunao|play\s*karo))\b",
+        ]
+        for pat in voice_play_patterns:
+            if re.search(pat, lower) or re.search(pat, norm_lower):
+                return ParsedIntent(
+                    tool_name="play_voice_sample",
+                    tool_args={},
+                    confidence=0.99,
+                    detected_language=lang,
+                    conversational_replies={
+                        "en": "Playing Kriti's voice audio sample now.",
+                        "hi": "कृति की आवाज़ का ऑडियो सैंपल चलाया जा रहा है।",
+                        "hinglish": "Kriti ka audio sample play kar rahi hoon.",
+                    },
+                )
+
         # 3. Workstation Lock
         lock_patterns = [
             r"\b(lock\s*(the|my)?\s*(workstation|pc|computer|screen))\b",
