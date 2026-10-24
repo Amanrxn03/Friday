@@ -99,21 +99,21 @@ class HinglishNormalizer:
         return None
 
     def extract_app_target(self, text: str) -> Optional[str]:
-        """Detect referenced approved applications."""
+        """Detect referenced approved applications using strict word boundaries to avoid false triggers."""
         lower = text.lower()
-        if "notepad" in lower or "नोटपैड" in lower:
+        if re.search(r"\b(notepad|नोटपैड)\b", lower):
             return "notepad"
-        if "calculator" in lower or "calc" in lower or "कैलकुलेटर" in lower or "कैलकुलेटर" in text:
+        if re.search(r"\b(calculator|calc|कैलकुलेटर)\b", lower) or "कैलकुलेटर" in text:
             return "calculator"
-        if "vs code" in lower or "vscode" in lower or "code" in lower or "कोड" in lower:
+        if re.search(r"\b(vs\s*code|vscode)\b", lower):
             return "vscode"
-        if "explorer" in lower or "file explorer" in lower or "एक्सप्लोरर" in lower:
+        if re.search(r"\b(file\s*explorer|explorer|एक्सप्लोरर)\b", lower):
             return "explorer"
-        if "terminal" in lower or "windows terminal" in lower or "टर्मिनल" in lower:
+        if re.search(r"\b(terminal|windows\s*terminal|टर्मिनल)\b", lower):
             return "terminal"
-        if "chrome" in lower or "क्रोम" in lower:
+        if re.search(r"\b(chrome|google\s*chrome|क्रोम)\b", lower):
             return "chrome"
-        if "edge" in lower or "एज" in lower:
+        if re.search(r"\b(edge|msedge|microsoft\s*edge|एज)\b", lower):
             return "edge"
         return None
 
