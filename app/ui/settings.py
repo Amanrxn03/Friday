@@ -163,6 +163,20 @@ class SettingsView(QWidget):
         v_layout = QVBoxLayout(voice_card)
         v_layout.addWidget(QLabel("<b>VOICE PERSONA & CUSTOM VOICE CLONING (KRITI'S VOICE)</b>"))
 
+        # Assistant Persona Nickname
+        row_nick = QHBoxLayout()
+        row_nick.addWidget(QLabel("Assistant Nickname:"))
+        self.txt_nickname = QLineEdit(config.assistant_nickname)
+        self.txt_nickname.setPlaceholderText("e.g. Kriti")
+        row_nick.addWidget(self.txt_nickname)
+
+        btn_save_nick = QPushButton("Update Nickname")
+        btn_save_nick.setProperty("class", "secondary-btn")
+        btn_save_nick.clicked.connect(self._save_nickname)
+        row_nick.addWidget(btn_save_nick)
+        row_nick.addStretch()
+        v_layout.addLayout(row_nick)
+
         # Voice Profile Selector
         row_voice = QHBoxLayout()
         row_voice.addWidget(QLabel("Active Voice Persona:"))
@@ -297,6 +311,14 @@ class SettingsView(QWidget):
         success = secret_store.set_credential(provider, key_val)
         if success:
             QMessageBox.information(self, "Saved", f"Securely stored {provider.title()} API key in Windows Credential Manager.")
+
+    def _save_nickname(self) -> None:
+        new_nick = self.txt_nickname.text().strip()
+        if new_nick:
+            config.assistant_nickname = new_nick
+            from app.memory.memory_service import memory_service
+            memory_service.remember("assistant_nickname", new_nick, category="preference", is_verified=True)
+            QMessageBox.information(self, "Nickname Saved", f"Assistant nickname set to '{new_nick}'.")
 
     def _on_voice_profile_changed(self, idx: int) -> None:
         if idx >= 0 and idx < len(self._voice_items):

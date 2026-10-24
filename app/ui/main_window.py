@@ -24,6 +24,7 @@ from app.core.permissions import permissions_engine, ApprovalRequest
 from app.voice.audio_stream import audio_stream
 from app.voice.voice_session import voice_session
 from app.ai.provider_manager import provider_manager
+from app.config import config
 
 
 class MainWindowBridge(QObject):
@@ -37,7 +38,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FRIDAY — Personal AI Desktop Companion")
+        self.setWindowTitle(f"{config.app_name} ({config.assistant_nickname}) — Personal AI Desktop Companion")
         self.resize(1180, 780)
         self.setMinimumSize(900, 600)
         self.setStyleSheet(FRIDAY_STYLESHEET)
@@ -98,7 +99,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(14)
 
         # Logo & Name
-        logo = QLabel("FRIDAY")
+        logo = QLabel(f"{config.app_name} · {config.assistant_nickname}")
         logo.setStyleSheet(f"font-size: 16px; font-weight: 800; color: {COLOR_CYAN_ACCENT}; letter-spacing: 2px;")
         layout.addWidget(logo)
 

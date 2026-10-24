@@ -68,7 +68,7 @@ def test_ui_components_smoke_test(qapp):
     from app.ui.widgets.approval_dialog import ApprovalDialog
 
     window = MainWindow()
-    assert window.windowTitle() == "FRIDAY — Personal AI Desktop Companion"
+    assert "FRIDAY" in window.windowTitle() and "Personal AI Desktop Companion" in window.windowTitle()
 
     hud = CompactHUD(main_window=window)
     assert hud.width() == 540

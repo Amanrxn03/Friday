@@ -21,11 +21,22 @@ class WakeWordDetector:
     """Detects the wake phrase locally using energy and spectral pattern matching."""
 
     def __init__(self, wake_word: Optional[str] = None):
-        self.wake_word = wake_word or config.voice.wake_word
+        raw = wake_word or config.voice.wake_word
+        self.wake_words = [w.strip() for w in raw.split(",") if w.strip()]
+        if config.assistant_nickname and config.assistant_nickname not in self.wake_words:
+            self.wake_words.extend([f"Hey {config.assistant_nickname}", config.assistant_nickname])
+        self.wake_word = self.wake_words[0] if self.wake_words else "Hey Friday"
         self.is_active = False
         self._lock = threading.RLock()
         self._last_trigger_time = 0.0
         self._cooldown_seconds = 2.0  # Prevent duplicate instant triggers
+
+    def matches_wake_word(self, text: str) -> bool:
+        """Check if spoken text matches any active wake word."""
+        if not text:
+            return False
+        lower_text = text.lower()
+        return any(w.lower() in lower_text for w in self.wake_words) or "kriti" in lower_text or "friday" in lower_text
 
     def start(self) -> None:
         """Attach listener to the audio stream."""
@@ -34,7 +45,7 @@ class WakeWordDetector:
                 return
             self.is_active = True
             audio_stream.add_listener(self._process_audio_chunk)
-            logger.info("Wake word detector active for phrase: '%s'", self.wake_word)
+            logger.info("Wake word detector active for phrases: %s", self.wake_words)
 
     def stop(self) -> None:
         """Detach listener."""

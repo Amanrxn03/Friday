@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any
 
 from app.nlp.language_detector import language_detector
 from app.nlp.hinglish_normalizer import hinglish_normalizer
+from app.config import config
 
 
 @dataclass
@@ -35,7 +36,7 @@ class IntentMatcher:
         lang = language_detector.detect(clean)
 
         # Strip conversational fillers, wake phrases, and polite prefixes
-        prefix_pattern = r"^(hey\s*friday|friday|suno\s*friday|frida|hello\s*friday|hi\s*friday|please|can\s*you|could\s*you|kripya|bhai|yaar|zara)\s*[,:\s]+"
+        prefix_pattern = r"^(hey\s*friday|friday|suno\s*friday|frida|hello\s*friday|hi\s*friday|hey\s*kriti|kriti|suno\s*kriti|hello\s*kriti|hi\s*kriti|please|can\s*you|could\s*you|kripya|bhai|yaar|zara)\s*[,:\s]+"
         norm_clean = re.sub(prefix_pattern, "", clean, flags=re.I).strip()
         norm_lower = norm_clean.lower() if norm_clean else lower
 
@@ -260,20 +261,21 @@ class IntentMatcher:
             )
 
         # 9. Conversational Greetings & Identity (Fallback for pure conversational turns)
-        if re.search(r"\b(who\s*are\s*you|what\s*is\s*your\s*name|tum\s*kaun\s*ho|kaun\s*ho\s*tum)\b", lower) or re.search(r"\b(who\s*are\s*you|what\s*is\s*your\s*name|tum\s*kaun\s*ho|kaun\s*ho\s*tum)\b", norm_lower):
+        if re.search(r"\b(who\s*are\s*you|what\s*is\s*your\s*name|tum\s*kaun\s*ho|kaun\s*ho\s*tum|tumhara\s*naam\s*kya\s*hai|naam\s*kya\s*hai)\b", lower) or re.search(r"\b(who\s*are\s*you|what\s*is\s*your\s*name|tum\s*kaun\s*ho|kaun\s*ho\s*tum|tumhara\s*naam\s*kya\s*hai|naam\s*kya\s*hai)\b", norm_lower):
+            nick = config.assistant_nickname or "Kriti"
             return ParsedIntent(
                 tool_name="get_system_status",
                 tool_args={},
                 confidence=0.98,
                 detected_language=lang,
                 conversational_replies={
-                    "en": "I am FRIDAY, your personal AI desktop companion for Windows 11.",
-                    "hi": "मैं फ्राइडे हूँ, आपकी व्यक्तिगत AI डेस्कटॉप साथी।",
-                    "hinglish": "Main FRIDAY hoon, aapki personal AI desktop assistant.",
+                    "en": f"I am FRIDAY, and you can also call me {nick}! Your personal AI desktop companion for Windows 11.",
+                    "hi": f"मैं फ्राइडे हूँ, और आप मुझे {nick} भी बुला सकते हैं! आपकी व्यक्तिगत AI डेस्कटॉप साथी।",
+                    "hinglish": f"Main FRIDAY hoon, aur aap mujhe {nick} bhi bula sakte hain! Aapki personal AI desktop assistant.",
                 },
             )
 
-        if re.search(r"\b(hi|hello|hey|namaste|नमस्ते|kaise\s*ho|how\s*are\s*you|kya\s*haal\s*hai)\b", norm_lower) or re.search(r"\b(hi|hello|hey|namaste)\s*(friday)?\b", lower):
+        if re.search(r"\b(hi|hello|hey|namaste|नमस्ते|kaise\s*ho|how\s*are\s*you|kya\s*haal\s*hai)\b", norm_lower) or re.search(r"\b(hi|hello|hey|namaste)\s*(friday|kriti)?\b", lower):
             return ParsedIntent(
                 tool_name="get_system_status",
                 tool_args={},

@@ -13,6 +13,7 @@ from app.ui.widgets.waveform import WaveformVisualizer
 from app.voice.voice_session import voice_session
 from app.core.event_bus import event_bus, Events
 from app.ui.theme import COLOR_BG_DARK, COLOR_BORDER, COLOR_CYAN_ACCENT
+from app.config import config
 
 
 class CompactHUD(QWidget):
@@ -56,7 +57,7 @@ class CompactHUD(QWidget):
         layout.setSpacing(10)
 
         # Logo / Drag handle
-        logo = QLabel("FRIDAY")
+        logo = QLabel(f"{config.app_name} · {config.assistant_nickname}")
         logo.setStyleSheet(f"font-size: 11px; font-weight: 800; color: {COLOR_CYAN_ACCENT}; letter-spacing: 1px;")
         layout.addWidget(logo)
 

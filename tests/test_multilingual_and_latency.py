@@ -229,4 +229,31 @@ def test_custom_voice_profile_and_kriti_selection():
         assert intent.tool_args.get("profile_id") == "kriti"
 
 
+def test_assistant_nickname_kriti_awareness():
+    """Verify assistant nickname configuration, greeting identity replies, and wake word matching."""
+    from app.config import config
+    from app.nlp.intent_matcher import IntentMatcher
+    from app.voice.wake_word import WakeWordDetector
+    from app.core.orchestrator import orchestrator
+
+    assert config.assistant_nickname == "Kriti"
+
+    # Fast-path intent matching with Kriti prefix
+    matcher = IntentMatcher()
+    intent = matcher.match_intent("Hey Kriti, what time is it?")
+    assert intent is not None
+    assert intent.tool_name == "get_current_time"
+
+    # Identity answers acknowledge nickname Kriti
+    res = orchestrator.process_user_turn("Who are you?")
+    assert "Kriti" in res["reply"]
+    assert "What else can I do for you?" in res["reply"]
+
+    # Wake word detector matches Kriti
+    detector = WakeWordDetector()
+    assert detector.matches_wake_word("Hey Kriti")
+    assert detector.matches_wake_word("Suno Kriti, suno")
+
+
+
 

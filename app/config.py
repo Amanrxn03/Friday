@@ -51,7 +51,7 @@ class AIProviderConfig:
 class VoiceConfig:
     """Settings for speech-to-text, wake-word, and text-to-speech."""
     enabled: bool = os.getenv("FRIDAY_VOICE_ENABLED", "true").lower() == "true"
-    wake_word: str = os.getenv("FRIDAY_WAKE_WORD", "Hey Friday")
+    wake_word: str = os.getenv("FRIDAY_WAKE_WORD", "Hey Friday, Hey Kriti")
     provider: str = os.getenv("FRIDAY_VOICE_PROVIDER", "local_sapi")  # local_sapi, cloud_openai, elevenlabs_clone
     voice_profile: str = os.getenv("FRIDAY_VOICE_PROFILE", "kriti")   # kriti, heera, zira, david
     custom_voice_path: str = os.getenv("FRIDAY_CUSTOM_VOICE_PATH", r"c:\Friday\app\assets\custom_voices\kriti.wav")
@@ -86,6 +86,7 @@ class BriefingConfig:
 class FridayConfig:
     """Master configuration for the FRIDAY application."""
     app_name: str = "FRIDAY"
+    assistant_nickname: str = os.getenv("FRIDAY_NICKNAME", "Kriti")
     version: str = "1.0.0"
     base_dir: Path = Path(__file__).resolve().parent.parent
     data_dir: Path = base_dir / "data"
