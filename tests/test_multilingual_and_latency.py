@@ -303,7 +303,11 @@ def test_wake_detector_rms_activation():
     """Verify that wake word detector activates on human speech RMS and ignores room silence."""
     import numpy as np
     from app.voice.wake_word import wake_word_detector
+    from app.voice.text_to_speech import tts_manager
     from app.core.event_bus import event_bus, Events
+
+    tts_manager.is_speaking = False
+    tts_manager.last_speech_end_time = 0.0
 
     triggered = []
     event_bus.subscribe(Events.WAKE_WORD_DETECTED, lambda d: triggered.append(d))
@@ -322,6 +326,34 @@ def test_wake_detector_rms_activation():
     silence_chunk = np.random.normal(0, 0.003, 1024).astype(np.float32)
     wake_word_detector._process_audio_chunk(silence_chunk)
     assert len(triggered) == 0
+
+
+def test_close_application_and_window_intents():
+    """Verify natural multilingual commands for closing applications and active windows."""
+    from app.core.orchestrator import orchestrator
+
+    # English command
+    res_en = orchestrator.process_user_turn("close notepad")
+    assert res_en["fast_path"] is True
+    assert "Closing Notepad for you." in res_en["reply"]
+    assert "What else can I do for you?" in res_en["reply"]
+
+    # Hinglish command
+    res_hing = orchestrator.process_user_turn("notepad band karo")
+    assert res_hing["fast_path"] is True
+    assert "Notepad close kar diya hai." in res_hing["reply"]
+    assert "What else can I do for you?" in res_hing["reply"]
+
+    # Hindi command
+    res_hi = orchestrator.process_user_turn("कैलकुलेटर बंद करो")
+    assert res_hi["fast_path"] is True
+    assert "Calculator को बंद किया जा रहा है।" in res_hi["reply"]
+
+    # Close active window
+    res_win = orchestrator.process_user_turn("close this window")
+    assert res_win["fast_path"] is True
+    assert "Closing the active window for you." in res_win["reply"]
+
 
 
 

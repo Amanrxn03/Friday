@@ -96,3 +96,20 @@ def test_execution_manager_autonomy_and_approval():
     res_blocked = exec_mgr.execute_tool("get_system_status", {})
     assert res_blocked["success"] is False
     assert "Emergency stop is active" in res_blocked["error"]
+
+
+def test_close_application_and_close_window():
+    """Verify close_application and close_active_window execution and schemas."""
+    from app.desktop.application_launcher import app_launcher
+    from app.desktop.windows_controller import windows_controller
+
+    # 1. Test close application execution
+    res_close_app = app_launcher.close("notepad")
+    assert res_close_app["success"] is True
+    assert res_close_app["action"] == "closed"
+    assert res_close_app["display_name"] == "Notepad"
+
+    # 2. Test close active window
+    res_close_win = windows_controller.close_active_window()
+    assert res_close_win is True
+

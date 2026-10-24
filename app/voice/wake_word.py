@@ -70,17 +70,26 @@ class WakeWordDetector:
 
     def _process_audio_chunk(self, chunk: np.ndarray) -> None:
         """Analyze local audio frames for speech activity / wake word presence."""
+        from app.voice.text_to_speech import tts_manager
         if not self.is_active or audio_stream.is_muted:
+            return
+
+        now = time.time()
+        # Suppress microphone processing while assistant is speaking or during room echo (300ms)
+        last_end = getattr(tts_manager, "last_speech_end_time", 0.0)
+        if tts_manager.is_speaking or (now - last_end < 0.3):
             return
 
         # Calculate true RMS amplitude of audio frame
         rms = float(np.sqrt(np.mean(chunk**2)))
-        now = time.time()
         
         # Human conversational speech onset threshold (~0.008 to 0.012 RMS)
         speech_threshold = max(0.008, config.voice.vad_energy_threshold * 0.7)
         if rms > speech_threshold:
-            if now - self._last_trigger_time > self._cooldown_seconds:
+            # Allow rapid conversational follow-ups after assistant speech (0.5s cooldown)
+            recent_tts = (now - last_end < 6.0)
+            cooldown = 0.5 if recent_tts else self._cooldown_seconds
+            if now - self._last_trigger_time > cooldown:
                 self._last_trigger_time = now
                 logger.info("Voice activity detected on microphone (RMS: %.4f > %.4f), activating listening session...", rms, speech_threshold)
                 event_bus.publish(Events.WAKE_WORD_DETECTED, {"source": "voice_vad", "wake_word": self.wake_word})

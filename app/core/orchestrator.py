@@ -168,7 +168,7 @@ class Orchestrator:
             error_reply = f"I encountered an issue with the AI provider: {ai_resp.error}"
             event_bus.publish(Events.ASSISTANT_MESSAGE, {"text": error_reply, "error": True})
             event_bus.publish(Events.STATE_CHANGED, "Error")
-            if source == "voice":
+            if source == "voice" or config.voice.enabled:
                 tts_manager.speak(error_reply, language=detected_lang)
             latency_tracker.record_turn(rec)
             return {"reply": error_reply, "error": True}
@@ -196,7 +196,7 @@ class Orchestrator:
                     self.conversation_history.append({"role": "assistant", "content": pending_msg})
                 event_bus.publish(Events.ASSISTANT_MESSAGE, {"text": pending_msg, "tool_results": tool_results})
                 event_bus.publish(Events.STATE_CHANGED, "Waiting for Approval")
-                if source == "voice":
+                if source == "voice" or config.voice.enabled:
                     tts_manager.speak("I need your approval before executing this action.", language=detected_lang)
                 latency_tracker.record_turn(rec)
                 return {"reply": pending_msg, "tool_results": tool_results}

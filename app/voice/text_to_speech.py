@@ -33,6 +33,7 @@ class TextToSpeechManager:
         self.custom_voice_path = config.voice.custom_voice_path
         self.custom_voice_name = config.voice.custom_voice_name
         self.is_speaking = False
+        self.last_speech_end_time: float = 0.0
         self._lock = threading.RLock()
         self._speech_queue: queue.Queue = queue.Queue()
         self._stop_requested = threading.Event()
@@ -129,6 +130,8 @@ class TextToSpeechManager:
             finally:
                 with self._lock:
                     self.is_speaking = False
+                    import time
+                    self.last_speech_end_time = time.time()
                 event_bus.publish(Events.VOICE_STATE, "IDLE")
                 self._speech_queue.task_done()
 
@@ -264,6 +267,8 @@ class TextToSpeechManager:
         finally:
             with self._lock:
                 self.is_speaking = False
+                import time
+                self.last_speech_end_time = time.time()
             event_bus.publish(Events.VOICE_STATE, "IDLE")
 
     def play_custom_sample(self, sample_path: Optional[str] = None) -> None:

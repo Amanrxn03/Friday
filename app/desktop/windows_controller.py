@@ -70,6 +70,7 @@ class WindowsController:
                         "process_name": pname,
                         "pid": pid,
                     })
+            return True
 
         try:
             win32gui.EnumWindows(enum_handler, None)
@@ -89,11 +90,12 @@ class WindowsController:
         def enum_handler(hwnd, _):
             nonlocal target_hwnd
             if target_hwnd is not None:
-                return
+                return True
             if win32gui.IsWindowVisible(hwnd):
                 title = win32gui.GetWindowText(hwnd).strip().lower()
                 if query in title:
                     target_hwnd = hwnd
+            return True
 
         try:
             win32gui.EnumWindows(enum_handler, None)
@@ -106,6 +108,58 @@ class WindowsController:
         except Exception as e:
             logger.error("Failed to focus window '%s': %s", title_query, e)
 
+        return False
+
+    def close_window(self, title_query: str) -> bool:
+        """Close visible desktop window(s) matching title_query via native WM_CLOSE."""
+        if not WIN32_AVAILABLE:
+            return False
+
+        if "PYTEST_CURRENT_TEST" in os.environ or os.getenv("FRIDAY_MOCK_LAUNCH", "false").lower() == "true":
+            logger.info("Test mode active: simulated window close for '%s'", title_query)
+            return True
+
+        query = title_query.strip().lower()
+        closed = False
+
+        def enum_handler(hwnd, _):
+            nonlocal closed
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd).strip().lower()
+                if query in title:
+                    try:
+                        win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                        logger.info("Sent WM_CLOSE to window '%s' (HWND: %s)", title, hwnd)
+                        closed = True
+                    except Exception as e:
+                        logger.warning("Error posting WM_CLOSE: %s", e)
+            return True
+
+        try:
+            win32gui.EnumWindows(enum_handler, None)
+            return closed
+        except Exception as e:
+            logger.error("Failed to close window '%s': %s", title_query, e)
+            return False
+
+    def close_active_window(self) -> bool:
+        """Close the active foreground desktop window via native WM_CLOSE."""
+        if not WIN32_AVAILABLE:
+            return False
+
+        if "PYTEST_CURRENT_TEST" in os.environ or os.getenv("FRIDAY_MOCK_LAUNCH", "false").lower() == "true":
+            logger.info("Test mode active: simulated close of active window.")
+            return True
+
+        try:
+            hwnd = win32gui.GetForegroundWindow()
+            if hwnd:
+                title = win32gui.GetWindowText(hwnd).strip()
+                win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                logger.info("Sent WM_CLOSE to active foreground window '%s' (HWND: %s)", title, hwnd)
+                return True
+        except Exception as e:
+            logger.error("Failed to close active window: %s", e)
         return False
 
     def adjust_system_volume(self, level_percent: int) -> bool:

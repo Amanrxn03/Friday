@@ -62,7 +62,7 @@ class VoiceSession:
 
     def _maintain_preroll(self, chunk: np.ndarray) -> None:
         """Continuously keep the most recent ~500ms of audio frames to prevent clipping the wake word."""
-        if not self.is_listening_for_speech:
+        if not self.is_listening_for_speech and not tts_manager.is_speaking:
             self._preroll_buffer.append(chunk)
 
     def _on_wake_word_triggered(self, data) -> None:
@@ -87,7 +87,7 @@ class VoiceSession:
     def _collect_speech_frames(self, chunk: np.ndarray) -> None:
         """Buffer incoming microphone speech until adaptive pause/silence is detected."""
         with self._lock:
-            if not self.is_listening_for_speech:
+            if not self.is_listening_for_speech or tts_manager.is_speaking:
                 return
 
             self._speech_buffer.append(chunk)

@@ -163,6 +163,30 @@ def register_default_tools(registry: ToolRegistry) -> None:
         is_high_impact=False,
     )
 
+    # 6b. Close Application
+    registry.register(
+        name="close_application",
+        description="Close or terminate an approved Windows application (notepad, calculator, vscode, explorer, terminal, edge, chrome).",
+        parameters={
+            "type": "object",
+            "properties": {
+                "app_alias": {"type": "string", "description": "App alias to close: notepad, calculator, vscode, explorer, terminal, edge, chrome"},
+            },
+            "required": ["app_alias"],
+        },
+        handler=app_launcher.close,
+        is_high_impact=False,
+    )
+
+    # 6c. Close Active Window
+    registry.register(
+        name="close_active_window",
+        description="Close the currently active foreground desktop window.",
+        parameters={"type": "object", "properties": {}},
+        handler=windows_controller.close_active_window,
+        is_high_impact=False,
+    )
+
     # 7. List Directory
     registry.register(
         name="list_directory",

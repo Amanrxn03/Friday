@@ -198,21 +198,58 @@ class IntentMatcher:
                     },
                 )
 
-        # 6. Launch Approved Applications
+        # 6. Approved Desktop Applications (Launch & Close)
         app_target = hinglish_normalizer.extract_app_target(norm_clean) or hinglish_normalizer.extract_app_target(clean)
         action = hinglish_normalizer.extract_action(norm_clean) or hinglish_normalizer.extract_action(clean)
         is_direct_app_name = norm_lower in ("notepad", "calculator", "vscode", "explorer", "terminal", "chrome", "edge")
 
+        display_names = {
+            "notepad": "Notepad",
+            "calculator": "Calculator",
+            "vscode": "Visual Studio Code",
+            "explorer": "File Explorer",
+            "terminal": "Windows Terminal",
+            "chrome": "Google Chrome",
+            "edge": "Microsoft Edge",
+        }
+
+        # 6a. Close Approved Applications (e.g. "close notepad", "notepad band karo", "calc band kar do")
+        is_close_command = (
+            action == "CLOSE"
+            or "बंद" in lower
+            or re.search(r"\b(close|exit|quit|terminate|band\s*karo|band\s*kar\s*do|hatao)\b", lower)
+            or re.search(r"\b(close|exit|quit|terminate|band\s*karo|band\s*kar\s*do|hatao)\b", norm_lower)
+        )
+        if app_target and is_close_command:
+            d_name = display_names.get(app_target, app_target)
+            return ParsedIntent(
+                tool_name="close_application",
+                tool_args={"app_alias": app_target},
+                confidence=0.99,
+                detected_language=lang,
+                conversational_replies={
+                    "en": f"Closing {d_name} for you.",
+                    "hi": f"{d_name} को बंद किया जा रहा है।",
+                    "hinglish": f"{d_name} close kar diya hai.",
+                },
+            )
+
+        # 6b. Close Active Window (e.g. "close this window", "close window", "window band karo")
+        if re.search(r"\b(close\s*(this\s*)?window|window\s*band\s*karo|is\s*window\s*ko\s*band\s*karo|विंडो\s*बंद\s*करो)\b", lower) or re.search(r"\b(close\s*(this\s*)?window|window\s*band\s*karo)\b", norm_lower):
+            return ParsedIntent(
+                tool_name="close_active_window",
+                tool_args={},
+                confidence=0.98,
+                detected_language=lang,
+                conversational_replies={
+                    "en": "Closing the active window for you.",
+                    "hi": "सक्रिय विंडो बंद की जा रही है।",
+                    "hinglish": "Active window close kar rahi hoon.",
+                },
+            )
+
+        # 6c. Launch Approved Applications (e.g. "open notepad", "notepad kholo", "calculator chalao")
         if app_target and (action == "OPEN" or is_direct_app_name or "खोलो" in lower or "खोल" in lower or re.search(r"\b(open|launch|start|kholo|chalao)\b", lower) or re.search(r"\b(open|launch|start|kholo|chalao)\b", norm_lower)):
-            display_names = {
-                "notepad": "Notepad",
-                "calculator": "Calculator",
-                "vscode": "Visual Studio Code",
-                "explorer": "File Explorer",
-                "terminal": "Windows Terminal",
-                "chrome": "Google Chrome",
-                "edge": "Microsoft Edge",
-            }
             d_name = display_names.get(app_target, app_target)
             return ParsedIntent(
                 tool_name="launch_application",
