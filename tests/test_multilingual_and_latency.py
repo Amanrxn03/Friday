@@ -151,3 +151,26 @@ def test_latency_tracker_percentiles():
     assert stats["count"] == 5
     assert stats["e2e_p50_ms"] == 30.0
     assert stats["e2e_p95_ms"] >= 80.0
+
+
+def test_followup_question_after_instructions():
+    """Verify FRIDAY concludes instruction completions with 'What else can I do for you?'."""
+    orch = Orchestrator()
+    permissions_engine.reset_emergency_stop()
+
+    # English command
+    res_en = orch.process_user_turn("open notepad", source="text")
+    assert "What else can I do for you?" in res_en.get("reply")
+
+    # Hinglish command
+    res_hing = orch.process_user_turn("notepad kholo", source="text")
+    assert "What else can I do for you?" in res_hing.get("reply")
+
+    # Hindi command
+    res_hi = orch.process_user_turn("कैलकुलेटर खोलो", source="text")
+    assert "मैं आपके लिए और क्या कर सकती हूँ?" in res_hi.get("reply")
+
+    # Cancellation should not append the follow-up
+    res_cancel = orch.process_user_turn("stop", source="text")
+    assert "What else can I do for you?" not in res_cancel.get("reply")
+

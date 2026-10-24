@@ -51,6 +51,32 @@ class Orchestrator:
             name="FridayTurnWorker",
         ).start()
 
+    def _get_followup_question(self, lang: str) -> str:
+        """Return polite follow-up inquiry based on detected language."""
+        if lang == "hi":
+            return "मैं आपके लिए और क्या कर सकती हूँ?"
+        return "What else can I do for you?"
+
+    def _append_followup(self, text: str, lang: str) -> str:
+        """Ensure completed instructions conclude with 'What else can I do for you?' without duplication."""
+        if not text:
+            return self._get_followup_question(lang)
+
+        followup = self._get_followup_question(lang)
+        lower = text.lower()
+        if (
+            "what else can i do" in lower
+            or "what else i can do" in lower
+            or "और क्या कर सकती हूँ" in text
+            or "aur kya kar sakti" in lower
+            or "kya kar sakti hoon" in lower
+            or "what else would you like" in lower
+        ):
+            return text
+
+        clean = text.rstrip()
+        return f"{clean} {followup}"
+
     def process_user_turn(
         self,
         user_text: str,
@@ -98,9 +124,10 @@ class Orchestrator:
             )
             rec.mark_tool_completion()
 
-            reply = fast_intent.conversational_replies.get(
+            base_reply = fast_intent.conversational_replies.get(
                 detected_lang, "Action completed."
             )
+            reply = self._append_followup(base_reply, detected_lang)
             with self._lock:
                 self.conversation_history.append({"role": "user", "content": user_text})
                 self.conversation_history.append({"role": "assistant", "content": reply})
@@ -179,10 +206,10 @@ class Orchestrator:
                 {"role": "user", "content": user_text},
                 {"role": "assistant", "content": f"Executed tools: {tool_results}. Synthesize a concise, verified response in {detected_lang}."},
             ]
-            final_resp = provider_manager.generate(synthesis_prompt)
-            assistant_reply = final_resp.content or "Action completed and verified successfully."
+            raw_reply = final_resp.content or "Action completed and verified successfully."
+            assistant_reply = self._append_followup(raw_reply, detected_lang)
         else:
-            assistant_reply = ai_resp.content
+            assistant_reply = self._append_followup(ai_resp.content or "", detected_lang)
 
         with self._lock:
             self.conversation_history.append({"role": "assistant", "content": assistant_reply})

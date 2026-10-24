@@ -66,19 +66,19 @@ class OfflineFallbackProvider(BaseAIProvider):
             content = (
                 "नमस्ते! मैं फ्राइडे हूँ। आपके NVIDIA RTX 4070 GPU पर लोकल Ollama AI मॉडल बैकग्राउंड "
                 "में लोड हो रहा है। मैं आपके ऐप्स खोल सकती हूँ, वॉल्यूम बदल सकती हूँ, पीसी लॉक कर सकती हूँ, "
-                "और सिस्टम स्टेटस चेक कर सकती हूँ। बताइए, क्या सहायता करूँ?"
+                "और सिस्टम स्टेटस चेक कर सकती हूँ। मैं आपके लिए और क्या कर सकती हूँ?"
             )
         elif lang == "hinglish":
             content = (
                 "Main sun rahi hoon! Aapke NVIDIA RTX 4070 GPU ke liye Ollama local AI model background "
                 "mein configure ho raha hai. Tab tak main aapke apps open karna, files check karna, "
-                "volume adjust karna aur PC controls execute kar sakti hoon. Bolo, kya kaam karna hai?"
+                "volume adjust karna aur PC controls execute kar sakti hoon. What else can I do for you?"
             )
         else:
             content = (
                 "I'm here! Ollama's local model is currently being prepared for your NVIDIA RTX 4070 GPU "
                 "in the background. In the meantime, I can launch your applications, adjust volume, "
-                "check system hardware, read files, and lock your workstation. What would you like me to do?"
+                "check system hardware, read files, and lock your workstation. What else can I do for you?"
             )
 
         return AIResponse(
