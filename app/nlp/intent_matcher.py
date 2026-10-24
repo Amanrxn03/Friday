@@ -152,7 +152,29 @@ class IntentMatcher:
                 },
             )
 
-        # 6. Morning Briefing / News
+        # 6. Popular Websites (YouTube, GitHub, Google, etc.)
+        website_map = {
+            "youtube": ("https://www.youtube.com", "YouTube", "यूट्यूब"),
+            "github": ("https://www.github.com", "GitHub", "गिटहब"),
+            "google": ("https://www.google.com", "Google", "गूगल"),
+            "chatgpt": ("https://chatgpt.com", "ChatGPT", "चैटजीपीटी"),
+            "reddit": ("https://www.reddit.com", "Reddit", "रेडिट"),
+        }
+        for site_key, (site_url, site_name, hi_site_name) in website_map.items():
+            if site_key in lower or hi_site_name in clean:
+                return ParsedIntent(
+                    tool_name="open_website",
+                    tool_args={"url": site_url},
+                    confidence=0.98,
+                    detected_language=lang,
+                    conversational_replies={
+                        "en": f"Opening {site_name} in your browser.",
+                        "hi": f"{site_name} आपके ब्राउज़र में खोला जा रहा है।",
+                        "hinglish": f"{site_name} browser mein open kar rahi hoon.",
+                    },
+                )
+
+        # 7. Morning Briefing / News
         if re.search(r"\b(briefing|morning\s*briefing|aaj\s*ka\s*briefing|news\s*batao|khabar\s*batao)\b", lower):
             return ParsedIntent(
                 tool_name="get_briefing",

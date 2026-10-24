@@ -19,6 +19,7 @@ from app.nlp.intent_matcher import intent_matcher, ParsedIntent
 from app.nlp.language_detector import language_detector
 from app.core.metrics import latency_tracker, TurnLatencyRecord
 from app.core.permissions import permissions_engine
+from app.config import config
 
 logger = logging.getLogger(__name__)
 
