@@ -206,6 +206,7 @@ class Orchestrator:
                 {"role": "user", "content": user_text},
                 {"role": "assistant", "content": f"Executed tools: {tool_results}. Synthesize a concise, verified response in {detected_lang}."},
             ]
+            final_resp = provider_manager.generate(synthesis_prompt)
             raw_reply = final_resp.content or "Action completed and verified successfully."
             assistant_reply = self._append_followup(raw_reply, detected_lang)
         else:

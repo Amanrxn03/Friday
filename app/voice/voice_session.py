@@ -82,15 +82,15 @@ class VoiceSession:
             self._speech_buffer.append(chunk)
             vad_state = adaptive_vad.process_chunk(chunk)
 
-            # End of speech detected by adaptive silence (150-300ms pause)
-            if vad_state == "SPEECH_END":
+            # End of speech detected by adaptive silence (150-200ms pause) or inactivity
+            if vad_state in ("SPEECH_END", "INACTIVITY_TIMEOUT"):
                 if self.current_turn_record:
                     self.current_turn_record.mark_vad_end_of_speech()
                 self._finalize_speech_input()
                 return
 
-            # Hard safety ceiling: 10 seconds max
-            if len(self._speech_buffer) > 150:
+            # Fast conversational safety ceiling: ~3.2 seconds max (50 chunks @ 64ms)
+            if len(self._speech_buffer) >= 50:
                 self._finalize_speech_input()
 
     def _finalize_speech_input(self) -> None:
@@ -107,6 +107,20 @@ class VoiceSession:
             return
 
         combined_audio = np.concatenate(frames)
+
+        # Trim leading and trailing silence to minimize audio payload size and transcription latency
+        try:
+            abs_audio = np.abs(combined_audio)
+            speech_pts = np.where(abs_audio > 0.008)[0]
+            if len(speech_pts) > 0:
+                pre_pad = int(16000 * 0.12)   # 120ms pre-roll
+                post_pad = int(16000 * 0.12)  # 120ms post-roll
+                start_pt = max(0, speech_pts[0] - pre_pad)
+                end_pt = min(len(combined_audio), speech_pts[-1] + post_pad)
+                combined_audio = combined_audio[start_pt:end_pt]
+        except Exception:
+            pass
+
         event_bus.publish(Events.VOICE_STATE, "PROCESSING")
 
         # Transcribe in background thread

@@ -34,6 +34,11 @@ class IntentMatcher:
         lower = clean.lower()
         lang = language_detector.detect(clean)
 
+        # Strip conversational fillers, wake phrases, and polite prefixes
+        prefix_pattern = r"^(hey\s*friday|friday|suno\s*friday|frida|hello\s*friday|hi\s*friday|please|can\s*you|could\s*you|kripya|bhai|yaar|zara)\s*[,:\s]+"
+        norm_clean = re.sub(prefix_pattern, "", clean, flags=re.I).strip()
+        norm_lower = norm_clean.lower() if norm_clean else lower
+
         # 1. Stop / Cancel / Negative Commands (Top Priority)
         cancel_patterns = [
             r"\b(stop|halt|cancel|abort)\b",
@@ -43,7 +48,7 @@ class IntentMatcher:
             r"\b(chup\s*ho\s*jao|shant\s*raho)\b",
         ]
         for pat in cancel_patterns:
-            if re.search(pat, lower):
+            if re.search(pat, lower) or re.search(pat, norm_lower):
                 return ParsedIntent(
                     tool_name="emergency_stop",
                     tool_args={"reason": "User cancellation command"},
@@ -57,34 +62,40 @@ class IntentMatcher:
                     },
                 )
 
-        # 2. System Status / Battery / Telemetry
-        status_patterns = [
-            r"\b(system\s*status|specs|hardware\s*info|cpu\s*usage|ram\s*usage)\b",
-            r"\b(battery\s*kitni\s*hai|battery\s*check\s*karo|system\s*check\s*karo|ram\s*kitna\s*hai)\b",
-            r"\b(सिस्टम\s*स्टेटस|बैटरी\s*कितनी\s*है|रैम\s*दिखाओ)\b",
+        # 2. Current Time & Date (<1ms instant response)
+        time_patterns = [
+            r"\b(what\s*time\s*is\s*it|what'?s\s*the\s*time|current\s*time)\b",
+            r"\b(time\s*kya\s*hai|samay\s*kya\s*hai|kitne\s*baje\s*hain|time\s*batao)\b",
+            r"\b(समय\s*क्या\s*है|कितने\s*बजे\s*हैं|टाइम\s*क्या\s*हुआ)\b",
+            r"\b(what\s*is\s*today'?s\s*date|today'?s\s*date|what\s*day\s*is\s*it|current\s*date)\b",
+            r"\b(aaj\s*ki\s*tarikh|tarikh\s*kya\s*hai|aaj\s*kaun\s*sa\s*din\s*hai)\b",
         ]
-        for pat in status_patterns:
-            if re.search(pat, lower):
+        for pat in time_patterns:
+            if re.search(pat, lower) or re.search(pat, norm_lower):
+                import datetime
+                now = datetime.datetime.now()
+                t_str = now.strftime("%I:%M %p")
+                d_str = now.strftime("%A, %B %d")
                 return ParsedIntent(
-                    tool_name="get_system_status",
+                    tool_name="get_current_time",
                     tool_args={},
-                    confidence=0.95,
+                    confidence=0.99,
                     detected_language=lang,
                     conversational_replies={
-                        "en": "Checking your system hardware telemetry.",
-                        "hi": "सिस्टम हार्डवेयर की जांच की जा रही है।",
-                        "hinglish": "System telemetry check kar rahi hoon.",
+                        "en": f"The current time is {t_str} on {d_str}.",
+                        "hi": f"अभी समय {t_str} है और आज {d_str} है।",
+                        "hinglish": f"Abhi time {t_str} ho raha hai, {d_str}.",
                     },
                 )
 
         # 3. Workstation Lock
         lock_patterns = [
-            r"\b(lock\s*(the)?\s*(workstation|pc|computer|screen))\b",
-            r"\b(pc|screen|system|workstation)?\s*lock\s*(karo|kar\s*do|kijiye)\b",
+            r"\b(lock\s*(the|my)?\s*(workstation|pc|computer|screen))\b",
+            r"\b(pc|screen|system|workstation)?\s*lock\s*(karo|kar\s*do|kijiye|kar)?\b",
             r"\b(स्क्रीन\s*लॉक\s*करो|कंप्यूटर\s*लॉक\s*करो|लॉक\s*करो)\b",
         ]
         for pat in lock_patterns:
-            if re.search(pat, lower):
+            if re.search(pat, lower) or re.search(pat, norm_lower):
                 return ParsedIntent(
                     tool_name="lock_workstation",
                     tool_args={},
@@ -98,7 +109,7 @@ class IntentMatcher:
                 )
 
         # 4. Volume Adjustment
-        vol_match = re.search(r"\b(volume|awaaz|sound)\s*(to|pe|par)?\s*(\d{1,3})\b", lower)
+        vol_match = re.search(r"\b(volume|awaaz|sound)\s*(to|pe|par)?\s*(\d{1,3})\b", lower) or re.search(r"\b(volume|awaaz|sound)\s*(to|pe|par)?\s*(\d{1,3})\b", norm_lower)
         if vol_match:
             vol_val = int(vol_match.group(3))
             return ParsedIntent(
@@ -113,7 +124,7 @@ class IntentMatcher:
                 },
             )
 
-        if re.search(r"\b(mute|sound\s*band\s*karo|awaaz\s*band\s*karo)\b", lower):
+        if re.search(r"\b(mute|sound\s*band\s*karo|awaaz\s*band\s*karo)\b", lower) or re.search(r"\b(mute|sound\s*band\s*karo|awaaz\s*band\s*karo)\b", norm_lower):
             return ParsedIntent(
                 tool_name="adjust_system_volume",
                 tool_args={"level_percent": 0},
@@ -126,10 +137,34 @@ class IntentMatcher:
                 },
             )
 
-        # 5. Launch Approved Applications
-        app_target = hinglish_normalizer.extract_app_target(clean)
-        action = hinglish_normalizer.extract_action(clean)
-        if app_target and (action == "OPEN" or "खोलो" in lower or "खोल" in lower or re.search(r"\b(open|launch|start|kholo|chalao)\b", lower)):
+        # 5. Popular Websites (YouTube, GitHub, Google, etc.)
+        website_map = {
+            "youtube": ("https://www.youtube.com", "YouTube", "यूट्यूब"),
+            "github": ("https://www.github.com", "GitHub", "गिटहब"),
+            "google": ("https://www.google.com", "Google", "गूगल"),
+            "chatgpt": ("https://chatgpt.com", "ChatGPT", "चैटजीपीटी"),
+            "reddit": ("https://www.reddit.com", "Reddit", "रेडिट"),
+        }
+        for site_key, (site_url, site_name, hi_site_name) in website_map.items():
+            if site_key in lower or site_key in norm_lower or hi_site_name in clean:
+                return ParsedIntent(
+                    tool_name="open_website",
+                    tool_args={"url": site_url},
+                    confidence=0.98,
+                    detected_language=lang,
+                    conversational_replies={
+                        "en": f"Opening {site_name} in your browser.",
+                        "hi": f"{site_name} आपके ब्राउज़र में खोला जा रहा है।",
+                        "hinglish": f"{site_name} browser mein open kar rahi hoon.",
+                    },
+                )
+
+        # 6. Launch Approved Applications
+        app_target = hinglish_normalizer.extract_app_target(norm_clean) or hinglish_normalizer.extract_app_target(clean)
+        action = hinglish_normalizer.extract_action(norm_clean) or hinglish_normalizer.extract_action(clean)
+        is_direct_app_name = norm_lower in ("notepad", "calculator", "vscode", "explorer", "terminal", "chrome", "edge")
+
+        if app_target and (action == "OPEN" or is_direct_app_name or "खोलो" in lower or "खोल" in lower or re.search(r"\b(open|launch|start|kholo|chalao)\b", lower) or re.search(r"\b(open|launch|start|kholo|chalao)\b", norm_lower)):
             display_names = {
                 "notepad": "Notepad",
                 "calculator": "Calculator",
@@ -152,30 +187,28 @@ class IntentMatcher:
                 },
             )
 
-        # 6. Popular Websites (YouTube, GitHub, Google, etc.)
-        website_map = {
-            "youtube": ("https://www.youtube.com", "YouTube", "यूट्यूब"),
-            "github": ("https://www.github.com", "GitHub", "गिटहब"),
-            "google": ("https://www.google.com", "Google", "गूगल"),
-            "chatgpt": ("https://chatgpt.com", "ChatGPT", "चैटजीपीटी"),
-            "reddit": ("https://www.reddit.com", "Reddit", "रेडिट"),
-        }
-        for site_key, (site_url, site_name, hi_site_name) in website_map.items():
-            if site_key in lower or hi_site_name in clean:
+        # 7. System Status / Battery / Telemetry
+        status_patterns = [
+            r"\b(system\s*status|specs|hardware\s*info|cpu\s*usage|ram\s*usage)\b",
+            r"\b(battery\s*kitni\s*hai|battery\s*check\s*karo|system\s*check\s*karo|ram\s*kitna\s*hai)\b",
+            r"\b(सिस्टम\s*स्टेटस|बैटरी\s*कितनी\s*है|रैम\s*दिखाओ)\b",
+        ]
+        for pat in status_patterns:
+            if re.search(pat, lower) or re.search(pat, norm_lower):
                 return ParsedIntent(
-                    tool_name="open_website",
-                    tool_args={"url": site_url},
-                    confidence=0.98,
+                    tool_name="get_system_status",
+                    tool_args={},
+                    confidence=0.95,
                     detected_language=lang,
                     conversational_replies={
-                        "en": f"Opening {site_name} in your browser.",
-                        "hi": f"{site_name} आपके ब्राउज़र में खोला जा रहा है।",
-                        "hinglish": f"{site_name} browser mein open kar rahi hoon.",
+                        "en": "Checking your system hardware telemetry.",
+                        "hi": "सिस्टम हार्डवेयर की जांच की जा रही है।",
+                        "hinglish": "System telemetry check kar rahi hoon.",
                     },
                 )
 
-        # 7. Morning Briefing / News
-        if re.search(r"\b(briefing|morning\s*briefing|aaj\s*ka\s*briefing|news\s*batao|khabar\s*batao)\b", lower):
+        # 8. Morning Briefing / News
+        if re.search(r"\b(briefing|morning\s*briefing|aaj\s*ka\s*briefing|news\s*batao|khabar\s*batao)\b", lower) or re.search(r"\b(briefing|morning\s*briefing|aaj\s*ka\s*briefing|news\s*batao|khabar\s*batao)\b", norm_lower):
             return ParsedIntent(
                 tool_name="get_briefing",
                 tool_args={},
@@ -185,6 +218,33 @@ class IntentMatcher:
                     "en": "Here is your morning briefing and news highlights.",
                     "hi": "यह रहा आपका आज का मॉर्निंग ब्रीफिंग।",
                     "hinglish": "Yeh raha aaj ka morning briefing aur news updates.",
+                },
+            )
+
+        # 9. Conversational Greetings & Identity (Fallback for pure conversational turns)
+        if re.search(r"\b(who\s*are\s*you|what\s*is\s*your\s*name|tum\s*kaun\s*ho|kaun\s*ho\s*tum)\b", lower) or re.search(r"\b(who\s*are\s*you|what\s*is\s*your\s*name|tum\s*kaun\s*ho|kaun\s*ho\s*tum)\b", norm_lower):
+            return ParsedIntent(
+                tool_name="get_system_status",
+                tool_args={},
+                confidence=0.98,
+                detected_language=lang,
+                conversational_replies={
+                    "en": "I am FRIDAY, your personal AI desktop companion for Windows 11.",
+                    "hi": "मैं फ्राइडे हूँ, आपकी व्यक्तिगत AI डेस्कटॉप साथी।",
+                    "hinglish": "Main FRIDAY hoon, aapki personal AI desktop assistant.",
+                },
+            )
+
+        if re.search(r"\b(hi|hello|hey|namaste|नमस्ते|kaise\s*ho|how\s*are\s*you|kya\s*haal\s*hai)\b", norm_lower) or re.search(r"\b(hi|hello|hey|namaste)\s*(friday)?\b", lower):
+            return ParsedIntent(
+                tool_name="get_system_status",
+                tool_args={},
+                confidence=0.98,
+                detected_language=lang,
+                conversational_replies={
+                    "en": "Hello! I am online and ready to assist you.",
+                    "hi": "नमस्ते! मैं ऑनलाइन हूँ और आपकी सहायता के लिए तैयार हूँ।",
+                    "hinglish": "Hello! Main online hoon aur aapki help ke liye ready hoon.",
                 },
             )
 

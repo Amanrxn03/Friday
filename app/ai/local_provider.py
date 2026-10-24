@@ -27,28 +27,54 @@ class LocalOllamaProvider(BaseAIProvider):
         model = default_model or config.ai.ollama_default_model
         super().__init__(name="ollama", default_model=model, timeout=timeout)
         self.base_url = base.rstrip("/")
+        self._availability_cache: Optional[bool] = None
+        self._availability_cache_time: float = 0.0
+        self._models_cache: List[str] = []
+        self._models_cache_time: float = 0.0
 
     def is_available(self) -> bool:
-        """Check whether local Ollama daemon is active and has at least one model ready."""
+        """Check whether local Ollama daemon is active and has at least one model ready (cached 30s)."""
+        import time
+        now = time.time()
+        if self._availability_cache is not None and (now - self._availability_cache_time) < 30.0:
+            return self._availability_cache
+
         try:
-            resp = requests.get(f"{self.base_url}/api/tags", timeout=2.0)
+            resp = requests.get(f"{self.base_url}/api/tags", timeout=1.5)
             if resp.status_code == 200:
                 models = resp.json().get("models", [])
-                return len(models) > 0
+                is_ready = len(models) > 0
+                self._availability_cache = is_ready
+                self._availability_cache_time = now
+                if is_ready:
+                    self._models_cache = [m["name"] for m in models]
+                    self._models_cache_time = now
+                return is_ready
+            self._availability_cache = False
+            self._availability_cache_time = now
             return False
         except Exception:
+            self._availability_cache = False
+            self._availability_cache_time = now
             return False
 
     def list_installed_models(self) -> List[str]:
-        """Return list of local models installed in Ollama."""
+        """Return list of local models installed in Ollama (cached 30s)."""
+        import time
+        now = time.time()
+        if self._models_cache and (now - self._models_cache_time) < 30.0:
+            return self._models_cache
+
         try:
-            resp = requests.get(f"{self.base_url}/api/tags", timeout=3.0)
+            resp = requests.get(f"{self.base_url}/api/tags", timeout=2.0)
             if resp.status_code == 200:
                 data = resp.json()
-                return [m["name"] for m in data.get("models", [])]
+                self._models_cache = [m["name"] for m in data.get("models", [])]
+                self._models_cache_time = now
+                return self._models_cache
         except Exception as e:
             logger.warning("Failed to list Ollama models: %s", e)
-        return []
+        return self._models_cache
 
     def get_effective_model(self, requested_model: Optional[str] = None) -> str:
         if requested_model:
@@ -74,9 +100,12 @@ class LocalOllamaProvider(BaseAIProvider):
             "model": target_model,
             "messages": messages,
             "stream": False,
+            "keep_alive": "15m",
             "options": {
                 "temperature": temperature,
-                "num_predict": max_tokens,
+                "num_predict": min(max_tokens, 1024),
+                "num_ctx": 2048,
+                "num_thread": 8,
             },
         }
         if tools:

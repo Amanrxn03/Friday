@@ -85,6 +85,24 @@ def register_default_tools(registry: ToolRegistry) -> None:
         is_high_impact=False,
     )
 
+    # 1b. Current System Time
+    def _get_system_time() -> Dict[str, Any]:
+        import datetime
+        now = datetime.datetime.now()
+        return {
+            "time": now.strftime("%I:%M %p"),
+            "date": now.strftime("%A, %B %d, %Y"),
+            "timestamp": now.isoformat(),
+        }
+
+    registry.register(
+        name="get_current_time",
+        description="Get current local time, date, and day of week.",
+        parameters={"type": "object", "properties": {}},
+        handler=_get_system_time,
+        is_high_impact=False,
+    )
+
     # 2. List Windows
     registry.register(
         name="list_open_windows",

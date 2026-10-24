@@ -20,77 +20,116 @@ logger = logging.getLogger(__name__)
 
 
 class TextToSpeechManager:
-    """Manages multilingual text-to-speech synthesis with sentence-chunked streaming playback."""
+    """Manages multilingual text-to-speech synthesis with pre-warmed persistent engine."""
 
     def __init__(self):
-        self.speech_rate = config.voice.speech_rate
+        self.speech_rate = max(200, config.voice.speech_rate)
         self.volume = config.voice.volume
         self.is_speaking = False
         self._lock = threading.RLock()
-        self._speech_thread: Optional[threading.Thread] = None
-        self._stop_requested = threading.Event()
         self._speech_queue: queue.Queue = queue.Queue()
-        self._queue_worker_thread: Optional[threading.Thread] = None
+        self._stop_requested = threading.Event()
+        self._engine = None
+        self._cached_voices: dict = {}
+        self._worker_thread: Optional[threading.Thread] = None
 
-    def _get_engine(self, language: str = "en"):
-        """Initialize pyttsx3 COM engine configured for the requested language."""
+        # Pre-warm persistent engine on startup
+        self._start_worker()
+
+    def _start_worker(self) -> None:
+        """Start persistent worker thread maintaining the COM SAPI5 engine."""
+        self._worker_thread = threading.Thread(
+            target=self._worker_loop,
+            daemon=True,
+            name="FridayTTSPersistentWorker",
+        )
+        self._worker_thread.start()
+
+    def _worker_loop(self) -> None:
+        """Dedicated persistent loop preventing repeated COM SAPI5 initialization overhead."""
         try:
-            engine = pyttsx3.init("sapi5")
-            engine.setProperty("rate", self.speech_rate)
-            engine.setProperty("volume", self.volume)
+            import pythoncom
+            pythoncom.CoInitialize()
+        except Exception:
+            pass
 
-            voices = engine.getProperty("voices")
-            selected_voice_id = None
+        try:
+            self._engine = pyttsx3.init("sapi5")
+            self._engine.setProperty("rate", self.speech_rate)
+            self._engine.setProperty("volume", self.volume)
 
-            # 1. If Hindi requested, search for Hindi voice
-            if language == "hi":
-                for voice in voices:
-                    vname = voice.name.lower()
-                    if "hindi" in vname or "kalpana" in vname or "hemant" in vname:
-                        selected_voice_id = voice.id
-                        break
-
-            # 2. If not found or English/Hinglish, look for Indian English or natural feminine voice
-            if not selected_voice_id:
-                for voice in voices:
-                    vname = voice.name.lower()
-                    if "india" in vname or "heera" in vname or "zira" in vname or "hazel" in vname or "female" in vname:
-                        selected_voice_id = voice.id
-                        break
-
-            if selected_voice_id:
-                engine.setProperty("voice", selected_voice_id)
-
-            return engine
+            voices = self._engine.getProperty("voices")
+            for v in voices:
+                vname = v.name.lower()
+                if "hindi" in vname or "kalpana" in vname or "hemant" in vname:
+                    self._cached_voices["hi"] = v.id
+                if "india" in vname or "heera" in vname or "zira" in vname or "female" in vname:
+                    if "en" not in self._cached_voices:
+                        self._cached_voices["en"] = v.id
+            logger.info("Persistent SAPI5 TTS engine pre-warmed successfully.")
         except Exception as e:
-            logger.warning("Could not initialize SAPI5 speech engine: %s", e)
-            return None
+            logger.warning("Could not pre-warm SAPI5 engine: %s", e)
+            self._engine = None
+
+        while True:
+            item = self._speech_queue.get()
+            if item is None:
+                break
+
+            chunk_text, lang = item
+            if self._stop_requested.is_set():
+                self._speech_queue.task_done()
+                continue
+
+            with self._lock:
+                self.is_speaking = True
+            event_bus.publish(Events.VOICE_STATE, "SPEAKING")
+
+            try:
+                target_voice = self._cached_voices.get(lang) or self._cached_voices.get("en")
+                if self._engine:
+                    if target_voice:
+                        try:
+                            self._engine.setProperty("voice", target_voice)
+                        except Exception:
+                            pass
+                    self._engine.setProperty("rate", self.speech_rate)
+                    self._engine.setProperty("volume", self.volume)
+                    self._engine.say(chunk_text)
+                    self._engine.runAndWait()
+            except Exception as e:
+                logger.debug("TTS playback chunk error: %s", e)
+            finally:
+                with self._lock:
+                    self.is_speaking = False
+                event_bus.publish(Events.VOICE_STATE, "IDLE")
+                self._speech_queue.task_done()
 
     def speak(self, text: str, language: str = "en", interrupt_existing: bool = True) -> None:
-        """Speak the provided text in a background thread without blocking the GUI."""
+        """Speak the provided text with instant clause streaming and zero COM init latency."""
         if not text or not text.strip() or not config.voice.enabled:
             return
 
         clean_text = text.strip()
 
-        if interrupt_existing and self.is_speaking:
+        if interrupt_existing:
             self.stop_speaking()
 
         self._stop_requested.clear()
-        self._speech_thread = threading.Thread(
-            target=self._run_speech_worker,
-            args=(clean_text, language),
-            daemon=True,
-            name="FridayTTSWorker",
-        )
-        self._speech_thread.start()
+
+        # Split into sentence clauses so speech output begins immediately on first clause
+        clauses = [c.strip() for c in re.split(r"(?<=[.!?\n।])\s+", clean_text) if c.strip()]
+        if not clauses:
+            clauses = [clean_text]
+
+        for clause in clauses:
+            self._speech_queue.put((clause, language))
 
     def speak_stream(self, token_generator: Generator[str, None, Any], language: str = "en") -> None:
         """Stream speech synthesis on sentence boundaries for ultra-low latency response."""
         self.stop_speaking()
         self._stop_requested.clear()
 
-        # Sentence delimiters: English (. ! ? \n) and Hindi Purna Viram (।)
         sentence_end_pattern = re.compile(r"([.!?\n।|])\s*")
 
         def stream_worker():
@@ -105,72 +144,32 @@ class TextToSpeechManager:
                     end_pos = last_match.end()
                     chunk = buffer[:end_pos].strip()
                     buffer = buffer[end_pos:]
-                    if chunk:
-                        self._speak_chunk_sync(chunk, language)
+                    if chunk and not self._stop_requested.is_set():
+                        self._speech_queue.put((chunk, language))
 
-            # Flush remaining tokens
             if buffer.strip() and not self._stop_requested.is_set():
-                self._speak_chunk_sync(buffer.strip(), language)
+                self._speech_queue.put((buffer.strip(), language))
 
         threading.Thread(target=stream_worker, daemon=True, name="FridayTTSStreamWorker").start()
 
-    def _speak_chunk_sync(self, text: str, language: str = "en") -> None:
-        """Synchronously speak one sentence chunk on the worker thread."""
-        if self._stop_requested.is_set() or not text:
-            return
-
-        with self._lock:
-            self.is_speaking = True
-
-        event_bus.publish(Events.VOICE_STATE, "SPEAKING")
-        engine = self._get_engine(language=language)
-        if engine:
-            try:
-                engine.say(text)
-                engine.runAndWait()
-            except Exception as e:
-                logger.error("TTS chunk synthesis error: %s", e)
-            finally:
-                try:
-                    engine.stop()
-                except Exception:
-                    pass
-
-        with self._lock:
-            self.is_speaking = False
-
-        event_bus.publish(Events.VOICE_STATE, "IDLE")
-
-    def _run_speech_worker(self, text: str, language: str = "en") -> None:
-        """Background thread executing complete speech text."""
-        with self._lock:
-            self.is_speaking = True
-
-        event_bus.publish(Events.VOICE_STATE, "SPEAKING")
-        logger.info("FRIDAY Speaking (%s): '%s'", language, text[:60])
-
-        engine = self._get_engine(language=language)
-        if engine:
-            try:
-                engine.say(text)
-                engine.runAndWait()
-            except Exception as e:
-                logger.error("TTS synthesis error: %s", e)
-            finally:
-                try:
-                    engine.stop()
-                except Exception:
-                    pass
-
-        with self._lock:
-            self.is_speaking = False
-
-        event_bus.publish(Events.VOICE_STATE, "IDLE")
-
     def stop_speaking(self) -> None:
         """Immediately interrupt and silence ongoing speech."""
+        self._stop_requested.set()
+        # Drain queued items
+        while not self._speech_queue.empty():
+            try:
+                self._speech_queue.get_nowait()
+                self._speech_queue.task_done()
+            except Exception:
+                break
+
+        if self._engine:
+            try:
+                self._engine.stop()
+            except Exception:
+                pass
+
         with self._lock:
-            self._stop_requested.set()
             if not self.is_speaking:
                 return
             self.is_speaking = False

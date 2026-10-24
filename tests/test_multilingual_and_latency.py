@@ -174,3 +174,27 @@ def test_followup_question_after_instructions():
     res_cancel = orch.process_user_turn("stop", source="text")
     assert "What else can I do for you?" not in res_cancel.get("reply")
 
+
+def test_conversational_prefix_and_low_latency_matching():
+    """Verify natural conversational prefixes and wake words are stripped for <1ms fast path."""
+    matcher = IntentMatcher()
+
+    test_queries = [
+        ("Hey Friday, open youtube", "open_website"),
+        ("Friday can you open notepad", "launch_application"),
+        ("Suno Friday, volume 70 pe set karo", "adjust_system_volume"),
+        ("Friday what time is it", "get_current_time"),
+        ("Please lock my screen", "lock_workstation"),
+        ("Who are you", "get_system_status"),
+        ("Hello Friday", "get_system_status"),
+    ]
+
+    for query, expected_tool in test_queries:
+        t0 = time.perf_counter()
+        intent = matcher.match_intent(query)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        assert intent is not None, f"Failed to match query: '{query}'"
+        assert intent.tool_name == expected_tool, f"Expected {expected_tool}, got {intent.tool_name} for '{query}'"
+        assert elapsed_ms < 5.0, f"Latency {elapsed_ms:.2f}ms exceeded 5.0ms target"
+
+
