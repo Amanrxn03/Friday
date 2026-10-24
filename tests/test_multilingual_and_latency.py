@@ -271,15 +271,58 @@ def test_hey_kriti_and_hello_kriti_personalized_wake_up():
     assert res_hello["reply"].endswith("What else can I do for you?")
     assert res_hello["fast_path"] is True
 
-    # 3. 'Hey Kriti wake up' -> 'Hey Aman! What else can I do for you?'
+    # 3. 'HIi Kriti' & 'Hii Kriti' (elongated typing/transcription) -> 'Hey Aman!'
+    res_hii = orchestrator.process_user_turn("HIi Kriti")
+    assert res_hii["reply"].startswith("Hey Aman!")
+    assert res_hii["reply"].endswith("What else can I do for you?")
+    assert res_hii["fast_path"] is True
+
+    res_hii2 = orchestrator.process_user_turn("Hii Kriti")
+    assert res_hii2["reply"].startswith("Hey Aman!")
+    assert res_hii2["fast_path"] is True
+
+    # 4. Acoustic homophones from speech recognition -> 'Hey Aman!' / 'Hello Aman!'
+    res_pretty = orchestrator.process_user_turn("Hey pretty")
+    assert res_pretty["reply"].startswith("Hey Aman!")
+
+    res_krithi = orchestrator.process_user_turn("Hello krithi")
+    assert res_krithi["reply"].startswith("Hello Aman!")
+
+    # 5. 'Hey Kriti wake up' -> 'Hey Aman! What else can I do for you?'
     res_hey_wake = orchestrator.process_user_turn("Hey Kriti wake up")
     assert res_hey_wake["reply"].startswith("Hey Aman!")
     assert res_hey_wake["reply"].endswith("What else can I do for you?")
 
-    # 4. 'Hello Kriti wake up' -> 'Hello Aman! What else can I do for you?'
+    # 6. 'Hello Kriti wake up' -> 'Hello Aman! What else can I do for you?'
     res_hello_wake = orchestrator.process_user_turn("Hello Kriti wake up")
     assert res_hello_wake["reply"].startswith("Hello Aman!")
     assert res_hello_wake["reply"].endswith("What else can I do for you?")
+
+
+def test_wake_detector_rms_activation():
+    """Verify that wake word detector activates on human speech RMS and ignores room silence."""
+    import numpy as np
+    from app.voice.wake_word import wake_word_detector
+    from app.core.event_bus import event_bus, Events
+
+    triggered = []
+    event_bus.subscribe(Events.WAKE_WORD_DETECTED, lambda d: triggered.append(d))
+    wake_word_detector.is_active = True
+    wake_word_detector._last_trigger_time = 0.0
+
+    # 1. Normal conversational voice frame (RMS ~0.03) triggers activation
+    voice_chunk = np.random.normal(0, 0.03, 1024).astype(np.float32)
+    wake_word_detector._process_audio_chunk(voice_chunk)
+    assert len(triggered) == 1
+    assert triggered[0]["source"] == "voice_vad"
+
+    # 2. Ambient room silence (RMS ~0.003) does not trigger
+    triggered.clear()
+    wake_word_detector._last_trigger_time = 0.0
+    silence_chunk = np.random.normal(0, 0.003, 1024).astype(np.float32)
+    wake_word_detector._process_audio_chunk(silence_chunk)
+    assert len(triggered) == 0
+
 
 
 

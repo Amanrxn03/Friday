@@ -31,7 +31,7 @@ class IntentMatcher:
         if not text or not text.strip():
             return None
 
-        clean = text.strip()
+        clean = hinglish_normalizer.normalize_wake_phrase(text.strip())
         lower = clean.lower()
         lang = language_detector.detect(clean)
 

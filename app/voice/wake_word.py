@@ -38,7 +38,9 @@ class WakeWordDetector:
         """Check if spoken text matches any active wake word."""
         if not text:
             return False
-        lower_text = text.lower()
+        from app.nlp.hinglish_normalizer import hinglish_normalizer
+        normalized = hinglish_normalizer.normalize_wake_phrase(text)
+        lower_text = normalized.lower()
         return any(w.lower() in lower_text for w in self.wake_words) or "kriti" in lower_text or "friday" in lower_text
 
     def start(self) -> None:
@@ -71,13 +73,16 @@ class WakeWordDetector:
         if not self.is_active or audio_stream.is_muted:
             return
 
-        energy = float(np.mean(chunk**2))
+        # Calculate true RMS amplitude of audio frame
+        rms = float(np.sqrt(np.mean(chunk**2)))
         now = time.time()
-        # When vocal speech energy is sustained and cooldown elapsed, activate listening
-        if energy > config.voice.vad_energy_threshold * 2.5:
+        
+        # Human conversational speech onset threshold (~0.008 to 0.012 RMS)
+        speech_threshold = max(0.008, config.voice.vad_energy_threshold * 0.7)
+        if rms > speech_threshold:
             if now - self._last_trigger_time > self._cooldown_seconds:
                 self._last_trigger_time = now
-                logger.info("Voice activity detected on microphone, activating listening session...")
+                logger.info("Voice activity detected on microphone (RMS: %.4f > %.4f), activating listening session...", rms, speech_threshold)
                 event_bus.publish(Events.WAKE_WORD_DETECTED, {"source": "voice_vad", "wake_word": self.wake_word})
 
 

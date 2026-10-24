@@ -76,8 +76,28 @@ class FreeSpeechRecognitionSTT(BaseSTTProvider):
             import speech_recognition as sr
             int16_data = (np.clip(audio_data, -1.0, 1.0) * 32767).astype(np.int16)
             audio = sr.AudioData(int16_data.tobytes(), sample_rate, 2)
-            # Recognize speech (handles English, Hindi, and Hinglish)
-            text = self.recognizer.recognize_google(audio)
+            
+            # 1. Try Indian English first (critical for Indian accents and names like Kriti and Aman)
+            text = None
+            try:
+                text = self.recognizer.recognize_google(audio, language="en-IN")
+            except Exception:
+                text = None
+
+            # 2. Fall back to standard English
+            if not text:
+                try:
+                    text = self.recognizer.recognize_google(audio, language="en-US")
+                except Exception:
+                    text = None
+
+            # 3. Fall back to Hindi
+            if not text:
+                try:
+                    text = self.recognizer.recognize_google(audio, language="hi-IN")
+                except Exception:
+                    text = None
+
             return text.strip() if text else ""
         except Exception as e:
             logger.debug("Free speech recognition result: %s", e)

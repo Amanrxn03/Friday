@@ -149,16 +149,31 @@ class VoiceSession:
             if turn_record:
                 turn_record.mark_stt_finalized()
 
-            if transcription and transcription.strip():
-                logger.info("Transcribed voice command: '%s'", transcription)
+            # Normalize wake phrase, typos, and acoustic homophones (e.g. 'hey pretty' -> 'hey kriti')
+            from app.nlp.hinglish_normalizer import hinglish_normalizer
+            norm_transcription = hinglish_normalizer.normalize_wake_phrase(transcription) if transcription else ""
+
+            if norm_transcription and norm_transcription.strip():
+                logger.info("Transcribed voice command: '%s' (raw: '%s')", norm_transcription, transcription)
                 event_bus.publish(Events.USER_MESSAGE, {
-                    "text": transcription,
+                    "text": norm_transcription,
                     "source": "voice",
                     "latency_record": turn_record,
                 })
             else:
-                logger.info("No audible speech detected in buffer.")
-                event_bus.publish(Events.VOICE_STATE, "IDLE")
+                # If audio was captured immediately following wake word trigger, but STT returned empty
+                # (e.g. short acoustic burst of 'Hey Kriti' or network hiccup)
+                audio_dur = len(audio_data) / 16000.0 if audio_data is not None else 0.0
+                if 0.3 <= audio_dur <= 2.5:
+                    logger.info("Short audio burst (%.2fs) captured; defaulting to wake greeting.", audio_dur)
+                    event_bus.publish(Events.USER_MESSAGE, {
+                        "text": "Hey Kriti",
+                        "source": "voice",
+                        "latency_record": turn_record,
+                    })
+                else:
+                    logger.info("No audible speech detected in buffer (duration: %.2fs).", audio_dur)
+                    event_bus.publish(Events.VOICE_STATE, "IDLE")
         except Exception as e:
             logger.error("Error transcribing speech: %s", e)
             event_bus.publish(Events.VOICE_STATE, "IDLE")

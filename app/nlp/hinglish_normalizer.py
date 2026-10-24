@@ -117,6 +117,30 @@ class HinglishNormalizer:
             return "edge"
         return None
 
+    @staticmethod
+    def normalize_wake_phrase(text: str) -> str:
+        """Normalize elongated greetings (hiii -> hi), typos, and acoustic homophones of Kriti."""
+        if not text:
+            return ""
+
+        # 1. Collapse elongated vowels/consonants in greetings: hii -> hi, heyy -> hey, helloo -> hello
+        res = re.sub(r"\bh+i+\b", "hi", text, flags=re.IGNORECASE)
+        res = re.sub(r"\bh+e+y+\b", "hey", res, flags=re.IGNORECASE)
+        res = re.sub(r"\bh+e+l+l+o+\b", "hello", res, flags=re.IGNORECASE)
+        res = re.sub(r"\bh+e+y+a+\b", "heya", res, flags=re.IGNORECASE)
+
+        # 2. Normalize common phonetic STT misrecognitions of Kriti when preceded by greetings
+        res = re.sub(
+            r"\b(hey|hello|hi|heya|suno|namaste)\s+(pretty|kitty|city|treaty|krithi|kirti|kritee|krity|preeti|priti|30)\b",
+            r"\1 kriti",
+            res,
+            flags=re.IGNORECASE,
+        )
+
+        # 3. Standalone common misspellings/transcriptions of Kriti
+        res = re.sub(r"\b(krithi|kirti|kritee|krity|preeti|priti)\b", "kriti", res, flags=re.IGNORECASE)
+        return res
+
 
 # Global singleton
 hinglish_normalizer = HinglishNormalizer()
