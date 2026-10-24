@@ -255,5 +255,33 @@ def test_assistant_nickname_kriti_awareness():
     assert detector.matches_wake_word("Suno Kriti, suno")
 
 
+def test_hey_kriti_and_hello_kriti_personalized_wake_up():
+    """Verify that saying 'Hey Kriti' yields 'Hey Aman' and 'Hello Kriti' yields 'Hello Aman'."""
+    from app.core.orchestrator import orchestrator
+
+    # 1. 'Hey Kriti' -> 'Hey Aman! What else can I do for you?'
+    res_hey = orchestrator.process_user_turn("Hey Kriti")
+    assert res_hey["reply"].startswith("Hey Aman!")
+    assert res_hey["reply"].endswith("What else can I do for you?")
+    assert res_hey["fast_path"] is True
+
+    # 2. 'Hello Kriti' -> 'Hello Aman! What else can I do for you?'
+    res_hello = orchestrator.process_user_turn("Hello Kriti")
+    assert res_hello["reply"].startswith("Hello Aman!")
+    assert res_hello["reply"].endswith("What else can I do for you?")
+    assert res_hello["fast_path"] is True
+
+    # 3. 'Hey Kriti wake up' -> 'Hey Aman! What else can I do for you?'
+    res_hey_wake = orchestrator.process_user_turn("Hey Kriti wake up")
+    assert res_hey_wake["reply"].startswith("Hey Aman!")
+    assert res_hey_wake["reply"].endswith("What else can I do for you?")
+
+    # 4. 'Hello Kriti wake up' -> 'Hello Aman! What else can I do for you?'
+    res_hello_wake = orchestrator.process_user_turn("Hello Kriti wake up")
+    assert res_hello_wake["reply"].startswith("Hello Aman!")
+    assert res_hello_wake["reply"].endswith("What else can I do for you?")
+
+
+
 
 

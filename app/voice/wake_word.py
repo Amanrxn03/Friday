@@ -23,9 +23,12 @@ class WakeWordDetector:
     def __init__(self, wake_word: Optional[str] = None):
         raw = wake_word or config.voice.wake_word
         self.wake_words = [w.strip() for w in raw.split(",") if w.strip()]
-        if config.assistant_nickname and config.assistant_nickname not in self.wake_words:
-            self.wake_words.extend([f"Hey {config.assistant_nickname}", config.assistant_nickname])
-        self.wake_word = self.wake_words[0] if self.wake_words else "Hey Friday"
+        if config.assistant_nickname:
+            nick = config.assistant_nickname
+            for phrase in [f"Hey {nick}", f"Hello {nick}", f"Hi {nick}", nick]:
+                if phrase not in self.wake_words:
+                    self.wake_words.append(phrase)
+        self.wake_word = self.wake_words[0] if self.wake_words else "Hey Kriti"
         self.is_active = False
         self._lock = threading.RLock()
         self._last_trigger_time = 0.0

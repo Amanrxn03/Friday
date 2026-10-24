@@ -275,16 +275,26 @@ class IntentMatcher:
                 },
             )
 
-        if re.search(r"\b(hi|hello|hey|namaste|नमस्ते|kaise\s*ho|how\s*are\s*you|kya\s*haal\s*hai)\b", norm_lower) or re.search(r"\b(hi|hello|hey|namaste)\s*(friday|kriti)?\b", lower):
+        greeting_pattern = r"\b(hi|hello|hey|namaste|नमस्ते|kaise\s*ho|how\s*are\s*you|kya\s*haal\s*hai|wake\s*up|uth\s*jao|jago|are\s*you\s*awake|are\s*you\s*there)\b"
+        if (
+            re.search(greeting_pattern, norm_lower)
+            or re.search(greeting_pattern, lower)
+            or re.search(r"\b(hi|hello|hey|namaste)\s*(friday|kriti)?\b", lower)
+            or norm_lower in ("kriti", "friday")
+            or lower in ("kriti", "friday")
+        ):
+            user_name = getattr(config, "user_name", "Aman") or "Aman"
+            is_hey = bool(re.search(r"\b(hey|hi)\b", lower) or re.search(r"\b(hey|hi)\b", norm_lower))
+            salutation = "Hey" if is_hey else "Hello"
             return ParsedIntent(
                 tool_name="get_system_status",
                 tool_args={},
                 confidence=0.98,
                 detected_language=lang,
                 conversational_replies={
-                    "en": "Hello! I am online and ready to assist you.",
-                    "hi": "नमस्ते! मैं ऑनलाइन हूँ और आपकी सहायता के लिए तैयार हूँ।",
-                    "hinglish": "Hello! Main online hoon aur aapki help ke liye ready hoon.",
+                    "en": f"{salutation} {user_name}!",
+                    "hi": f"नमस्ते {user_name}!",
+                    "hinglish": f"{salutation} {user_name}!",
                 },
             )
 

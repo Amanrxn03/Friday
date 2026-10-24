@@ -7,6 +7,7 @@ transcription -> task execution -> conversational vocal response.
 import threading
 import logging
 import time
+from collections import deque
 from typing import Optional, List
 import numpy as np
 
@@ -29,6 +30,7 @@ class VoiceSession:
         self.is_active = False
         self.is_listening_for_speech = False
         self._speech_buffer: List[np.ndarray] = []
+        self._preroll_buffer: deque = deque(maxlen=8)  # Retain ~512ms pre-trigger audio
         self._lock = threading.RLock()
         self.current_turn_record: Optional[TurnLatencyRecord] = None
 
@@ -39,6 +41,7 @@ class VoiceSession:
         """Start background audio capture and wake-word detector."""
         success = audio_stream.start()
         if success:
+            audio_stream.add_listener(self._maintain_preroll)
             wake_word_detector.start()
             self.is_active = True
             logger.info("Voice session active and awaiting wake word: '%s'", config.voice.wake_word)
@@ -47,6 +50,8 @@ class VoiceSession:
     def stop(self) -> None:
         """Stop all voice components."""
         wake_word_detector.stop()
+        audio_stream.remove_listener(self._maintain_preroll)
+        audio_stream.remove_listener(self._collect_speech_frames)
         audio_stream.stop()
         tts_manager.stop_speaking()
         self.is_active = False
@@ -54,6 +59,11 @@ class VoiceSession:
     def push_to_talk(self) -> None:
         """User pressed push-to-talk shortcut or button."""
         wake_word_detector.trigger_manually(source="push_to_talk")
+
+    def _maintain_preroll(self, chunk: np.ndarray) -> None:
+        """Continuously keep the most recent ~500ms of audio frames to prevent clipping the wake word."""
+        if not self.is_listening_for_speech:
+            self._preroll_buffer.append(chunk)
 
     def _on_wake_word_triggered(self, data) -> None:
         """Called when wake phrase is detected or push-to-talk is clicked."""
@@ -70,7 +80,8 @@ class VoiceSession:
 
         with self._lock:
             self.is_listening_for_speech = True
-            self._speech_buffer.clear()
+            self._speech_buffer = list(self._preroll_buffer)
+            self._preroll_buffer.clear()
             audio_stream.add_listener(self._collect_speech_frames)
 
     def _collect_speech_frames(self, chunk: np.ndarray) -> None:
